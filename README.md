@@ -3,7 +3,7 @@
 
 Welcome to **DebrisPy** — a lightweight package designed to compute the azimuthally averaged surface density (ASD) profiles in debris discs using both semi-analytical and Monte Carlo approaches ([see full documentation](#4-documentation) for usage and API reference).
 
-![Demo](https://media4.giphy.com/media/v1.Y2lkPTc5MGI3NjExaHd5ZDRwdnFzY3c3ZDdueW4xMWJibXF2dWF6aDNqY2VqaHB4Y2RnYiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/92kAjwIuxmnmhX3QN3/giphy.gif)
+![Demo](assets/demo.gif)
 
 ---
 
