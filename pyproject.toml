@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "debrispy"
+version = "0.1.0"
+description = "Debris disc surface density modeling and Monte Carlo sampling."
+readme = "README.md"
+requires-python = ">=3.8"
+
+authors = [
+    { name = "Deniz Akansoy", email = "da619@cam.ac.uk" }
+]
+
+dependencies = [
+    "numpy",
+    "scipy",
+    "matplotlib",
+    "tqdm",
+    "fast_histogram",
+    "numba",
+    "joblib"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ipykernel",
+    "notebook"
+]
+
+docs = [
+    "sphinx",
+    "sphinx-rtd-theme",
+    "myst-parser",
+    "nbsphinx"
+]
+
+[tool.setuptools]
+packages = ["debrispy"]
