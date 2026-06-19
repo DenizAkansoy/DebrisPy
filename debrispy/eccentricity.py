@@ -13,6 +13,12 @@ import numpy.typing as npt
 from functools import partial
 # ------------------------------------------------------------------------------------------------ #
 
+
+try:
+    trapz = np.trapezoid   # NumPy >= 2.0
+except AttributeError:
+    trapz = np.trapz       # NumPy < 2.0 (for backwards compatibility)
+
 class EccentricityProfile():
     """
     Abstract base class for eccentricity profiles.
@@ -39,7 +45,7 @@ class EccentricityProfile():
         raise NotImplementedError("Subclasses must implement a plot method.")
 
 class UniqueEccentricity(EccentricityProfile):
-    """
+    r"""
     Fixed eccentricity profile where eccentricity is a unique function of semi-major axis: e = e(a).
     
     By default implements a power-law profile e(a) = e0 * (a_min/a)^{power}, but accepts custom user-defined functions.
@@ -99,7 +105,7 @@ class UniqueEccentricity(EccentricityProfile):
         self._check_range()
     
     def _check_range(self):
-        """
+        r"""
         Verify that 0 ≤ e(a) < 1 over the full [a_min, a_max] range.
         
         Raises
@@ -117,7 +123,7 @@ class UniqueEccentricity(EccentricityProfile):
             self, 
             a: Union[float, npt.NDArray[np.float64]]
         ) -> Union[float, npt.NDArray[np.float64]]:
-        """
+        r"""
         Return eccentricity value(s) at given semi-major axis/axes.
         
         Parameters
@@ -140,7 +146,7 @@ class UniqueEccentricity(EccentricityProfile):
             e: Union[float, npt.NDArray[np.float64]], 
             a: Union[float, npt.NDArray[np.float64]]
         ) -> None:
-        """
+        r"""
         Distribution function ψ_e(e,a) is not defined for deterministic profiles.
         
         Raises
@@ -151,7 +157,7 @@ class UniqueEccentricity(EccentricityProfile):
         raise NotImplementedError("Fixed eccentricity profiles do not define a distribution ψ_e(e,a).")
 
     def __str__(self) -> str:
-        """
+        r"""
         Return a string representation of the eccentricity profile.
         """
         info: str = f"UniqueEccentricity(a_min={self.a_min}, a_max={self.a_max}"
@@ -162,7 +168,7 @@ class UniqueEccentricity(EccentricityProfile):
         return info
     
     def __call__(self, a_vals: Union[float, npt.NDArray[np.float64]]) -> npt.NDArray[np.float64]:
-        """
+        r"""
         Evaluate the eccentricity at specified semi-major axis values.
         This method provides a convenient function-like interface for the class.
 
@@ -180,7 +186,7 @@ class UniqueEccentricity(EccentricityProfile):
             self, 
             a: Union[float, npt.NDArray[np.float64]]
         ) -> Union[float, npt.NDArray[np.float64]]:
-        """
+        r"""
         Calculate the derivative de/da of the eccentricity profile using analytical or finite differences.
         
         Parameters
@@ -218,7 +224,7 @@ class UniqueEccentricity(EccentricityProfile):
             show: bool = True,
             **plot_kwargs
         ):
-        """
+        r"""
         Plot the eccentricity profile e(a) with flexible matplotlib customization.
 
         Parameters
@@ -301,7 +307,7 @@ class UniqueEccentricity(EccentricityProfile):
 
 
 class EccentricityDistribution(EccentricityProfile):
-    """
+    r"""
     Defines an eccentricity distribution ψ_e(e,a).
     Gridding and interpolation is required if auto_normalise is True, 
     otherwise the distribution is determined directly via the distribution_func.
@@ -382,7 +388,7 @@ class EccentricityDistribution(EccentricityProfile):
                 raise ValueError(f"distribution_func returned shape {self.psi_grid.shape}, expected {self.E.shape}")
 
             # Normalise the distribution (ψ_e(e,a)) over e for each a:
-            integrals = np.trapz(self.psi_grid, x=self.e_grid, axis=0)
+            integrals = trapz(self.psi_grid, x=self.e_grid, axis=0)
             if np.any(integrals == 0):
                 raise ValueError("Zero integral found during ψ_e normalization.")
             self.psi_grid /= integrals
@@ -400,20 +406,20 @@ class EccentricityDistribution(EccentricityProfile):
             )
     
     def _create_grid(self) -> None:
-        """
+        r"""
         Helper function to create the grid for autoamtic normalisation.
         The user can choose between uniform, warped or adaptive grids.
         """
 
         if self.grid_type == 'uniform':
-            """
+            r"""
             Create a simple uniform grid over the domain.
             """
             self.e_grid = np.linspace(0, 1, self.num_e_points)
             self.a_grid = np.linspace(self.a_min, self.a_max, self.num_a_points)
 
         elif self.grid_type == 'warped':
-            """
+            r"""
             The warped grid is created by summing the magnitude of the gradients over the domain,
             either directly or using a Gaussian filter (to spread out clumped points).
             The cumulative distribution function (CDF) is then built over the sum, and the inverse CDF is used to 
@@ -464,7 +470,7 @@ class EccentricityDistribution(EccentricityProfile):
             self.a_grid = np.unique(np.sort(self.a_grid))
 
         elif self.grid_type == 'adaptive':
-            """
+            r"""
             The adaptive grid is made effectively in the same way as the warped grid, 
             however, the e-grid is built per column (a) of the distribution, instead of over the whole domain.
 
@@ -546,7 +552,7 @@ class EccentricityDistribution(EccentricityProfile):
             e: Union[float, npt.NDArray[np.float64]], 
             a: Union[float, npt.NDArray[np.float64]]
         ) -> Union[float, npt.NDArray[np.float64]]:
-        """
+        r"""
         Evaluate the distribution at the provided points.
 
         If auto_normalise is True, the distribution is evaluated using the interpolator.
@@ -592,7 +598,7 @@ class EccentricityDistribution(EccentricityProfile):
             return normed
     
     def get_sampled_distribution(self) -> Tuple[npt.NDArray[np.float64], npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-        """
+        r"""
         Get the sampled distribution (e_grid, a_grid, psi_grid).
 
         If auto_normalise is True, the sampled distribution is the same as the grid data.
@@ -628,7 +634,7 @@ class EccentricityDistribution(EccentricityProfile):
         point_size: float = 10,
         cmap: str = 'viridis',
     ) -> None:
-        """
+        r"""
         Plot the eccentricity distribution.
 
         Parameters
@@ -761,7 +767,7 @@ class EccentricityDistribution(EccentricityProfile):
         ax: Optional[plt.Axes] = None,
         **plot_kwargs,
     ) -> None:
-        """
+        r"""
         Plot a 1D slice of the 2D eccentricity distribution psi(e, a).
 
         Parameters
@@ -844,7 +850,7 @@ class EccentricityDistribution(EccentricityProfile):
         
 
 class RayleighEccentricity(EccentricityDistribution):
-    """
+    r"""
     Eccentricity distribution assuming a properly normalized Rayleigh distribution.
     
     Parameters
@@ -913,7 +919,7 @@ class RayleighEccentricity(EccentricityDistribution):
         )
 
 class TopHatEccentricity(EccentricityDistribution):
-    """
+    r"""
     Eccentricity distribution :math:`\psi(e,a) = (1 / \lambda(a)) * e / \sqrt(\lambda(a)^2 - e^2)`,
     which yields a step-function kernel :math:`\phi(kappa,a) = (\pi / 2\lambda(a)) · 1_{kappa <= \lambda(a)}`.
 
@@ -979,7 +985,7 @@ class TopHatEccentricity(EccentricityDistribution):
         )
 
 class TriangularEccentricity(EccentricityDistribution):
-    """
+    r"""
     Eccentricity distribution:
     :math:`\psi(e,a) = (2e / \lambda(a)^2) * \ln[ (\lambda(a) + \sqrt(\lambda(a)^2 - e^2)) / e ]`,
     valid for :math:`0 \leq e < \lambda(a)`
@@ -1052,7 +1058,7 @@ class TriangularEccentricity(EccentricityDistribution):
         )
 
 class PowerLawEccentricity(EccentricityDistribution):
-    """
+    r"""
     Eccentricity distribution
     psi(e,a) = (2*zeta + 1) * lambda(a)^(-(2*zeta + 1)) * e * (lambda(a)^2 - e^2)^(zeta - 1/2)
     defined for 0 ≤ e < lambda(a), with zeta > 0.
@@ -1129,7 +1135,7 @@ class PowerLawEccentricity(EccentricityDistribution):
         )
 
 class TruncGaussEccentricity(EccentricityDistribution):
-    """
+    r"""
     Truncated Gaussian eccentricity distribution with a normalisation term.
 
     psi(e, a) = sqrt(2/pi) * C(a) * [

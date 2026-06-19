@@ -31,6 +31,11 @@ from .eccentricity import (
 # ------------------------------------------------------------------------------------------------ #
 
 
+try:
+    trapz = np.trapezoid   # NumPy >= 2.0
+except AttributeError:
+    trapz = np.trapz       # NumPy < 2.0 (for backwards compatibility)
+
 class Kernel:
     """
     Kernel class for easy conversion of a defined eccentrcity profile into the 
@@ -117,7 +122,7 @@ class Kernel:
     
     @_compute_kernel.register(RayleighEccentricity)
     def _(self, ecc_profile: RayleighEccentricity, a: np.ndarray, r: np.ndarray, approx: bool = False, **kwargs: any) -> np.ndarray:
-        """
+        r"""
         Compute Phi(r, a) for RayleighEccentricity
 
         Phi(r, a) = 1 / sigma) * exp(-kappa(r, a)^2 / (2 * sigma^2)) if approx = True (low eccentricity limit), else:
@@ -151,7 +156,7 @@ class Kernel:
     
     @_compute_kernel.register(TopHatEccentricity)
     def _(self, ecc_profile: TopHatEccentricity, a: np.ndarray, r: np.ndarray, **kwargs: any) -> np.ndarray:
-        """
+        r"""
         Compute Phi(r, a) for TopHatEccentricity
 
         Phi(r, a) = (pi / 2 * lambda(a)) if kappa(r, a) <= lambda(a), else 0
@@ -182,7 +187,7 @@ class Kernel:
     
     @_compute_kernel.register(TriangularEccentricity)
     def _(self, ecc_profile: TriangularEccentricity, a: np.ndarray, r: np.ndarray, **kwargs: any) -> np.ndarray:
-        """
+        r"""
         Compute Phi(r, a) for TriangularEccentricity
 
         Phi(kappa, a) = pi / lambda(a)^2 · (lambda(a) - kappa) for kappa <= lambda(a), 0 otherwise
@@ -212,7 +217,7 @@ class Kernel:
 
     @_compute_kernel.register(PowerLawEccentricity)
     def _(self, ecc_profile: PowerLawEccentricity, a: np.ndarray, r:np.ndarray, **kwargs: any) -> np.ndarray:
-        """
+        r"""
         Compute Phi(r, a) for PowerLawEccentricity
 
         Phi(kappa, a) = sqrt(pi) * lambda(a)^-(2*zeta + 1) * Gamma(zeta + 3/2) / Gamma(zeta + 1) * (lambda(a)^2 - kappa^2)^zeta for kappa <= lambda(a)
@@ -252,7 +257,7 @@ class Kernel:
 
     @_compute_kernel.register(TruncGaussEccentricity)
     def _(self, ecc_profile: TruncGaussEccentricity, a: np.ndarray, r: np.ndarray, **kwargs: any) -> np.ndarray:
-        """
+        r"""
         Compute Phi(r, a) for TruncGaussEccentricity
 
         Phi(kappa, a) = C(a) * exp(-kappa^2 / (2 * sigma_kappa(a)^2)) for kappa <= lambda(a), else 0
@@ -304,7 +309,7 @@ class Kernel:
           n_jobs: int = 4,
           **kwargs: any
         ) -> np.ndarray:
-        """
+        r"""
         Compute Phi(r, a) for EccentricityDistribution (general case)
 
         Parameters
@@ -392,7 +397,7 @@ class Kernel:
             max_level: int = 25,
             n_jobs: int = 4
         ) -> None:
-        """
+        r"""
         Compute the kernel for the eccentricity distribution
 
         Parameters
@@ -459,7 +464,7 @@ class Kernel:
             self, 
             method: str = 'linear'
         ) -> None:
-        """
+        r"""
         Build a 2-D interpolator for Phi after sampling.
         Interpolator used for the calculation of Phi(r, a) for the general case (no analytic solution available)
         Works for either a regular grid (Phi_grid) or scattered samples (for adaptive gridding).
@@ -503,7 +508,7 @@ class Kernel:
             n_jobs: int = 4, 
             eps: float = 1e-5
         ) -> np.ndarray:
-        """
+        r"""
         Compute Phi(r,a) for a general eccentricity distribution Psi(e,a)
 
         Using the trapezium rule (NumPy), parallelised for multiple CPU cores using joblib.
@@ -570,7 +575,7 @@ class Kernel:
             split_points: Optional[list[Union[float, Callable]]] = None, 
             max_level: int = 25
         ) -> np.ndarray:
-        """
+        r"""
         Compute Phi(r,a) for a general eccentricity distribution Psi(e,a) using Gauss-Legendre quadrature.
 
         Can work with both adaptive and fixed-order Gauss-Legendre quadrature.
@@ -694,7 +699,7 @@ class Kernel:
             adaptive_grid: bool = False, 
             upper_limit: Optional[Union[float, Callable]] = None
         ) -> np.ndarray:
-        """
+        r"""
         Compute Phi(r,a) for a general eccentricity distribution Psi(e,a) using scipy.integrate.quad (adaptive)
 
         Can be used for both adaptive and uniform gridding of the Kernel.
@@ -781,7 +786,7 @@ class Kernel:
             return self._compute_kernel(self.ecc_profile, a = a_vals, r = r_vals, approx=self.rayleigh_approx)
     
     def phi_grid(self) -> np.ndarray:
-        """
+        r"""
         Returns phi_grid if it has been computed.
         """
         if self.Phi_grid is None:
@@ -789,7 +794,7 @@ class Kernel:
         return self.Phi_grid
     
     def phi_samples(self) -> np.ndarray:
-        """
+        r"""
         Returns phi_samples if it has been computed.
         """
         if self.Phi_samples is None:
@@ -797,7 +802,7 @@ class Kernel:
         return self.Phi_samples
 
     def compute_grad(self) -> None:
-        """
+        r"""
         Compute the gradient of Phi(r,a) for a unique eccentricity distribution e = e(a), for the initialised grid.
         Uses the chain rule to compute the gradient.
         """
@@ -848,7 +853,7 @@ class Kernel:
             raise TypeError("Analytic gradient calculation only implemented for UniqueEccentricity.")
 
     def num_adaptive_points(self) -> int:
-        """
+        r"""
         Return the number of points in the adaptive Phi mesh.
         """
         if self.Phi_samples is None:
@@ -871,7 +876,7 @@ class Kernel:
             points: bool = False, 
             point_size: float = 10
         ) -> None:
-        """
+        r"""
         Main plotting function for the Kernel.
 
         This function plots the Phi(r,a) grid, or the Phi(r,a) samples, based on the chosen grid values.
@@ -968,7 +973,7 @@ class Kernel:
             x_lim: tuple = None,
             y_lim: tuple = None
         ) -> None:
-        """
+        r"""
         Plot a 1D marginal slice of Phi(r, a) at fixed a or fixed r.
 
         Parameters
@@ -1045,7 +1050,7 @@ class Kernel:
             filename: str = None, 
             a_slice: float = None
         ) -> None:
-            """
+            r"""
             Helper function to plot Phi(kappa, a) using sorted kappa and a 2D color plot,
             plus an optional secondary 1D plot of Phi(kappa) at a given a_slice (default: middle of a_grid).
 
@@ -1142,7 +1147,7 @@ class Kernel:
             save: bool = False, 
             filename: str = None
         ) -> None:
-        """
+        r"""
         Plot the gradient of the kernel.
 
         Parameters
@@ -1235,7 +1240,7 @@ def compute_phi_row_trapz(
         psi_col: np.ndarray, 
         eps: float = 1e-5
     ) -> Tuple[int, np.ndarray]:
-    """
+    r"""
     Compute Phi(r,a) for a general eccentricity distribution Psi(e,a)
     This method is used to compute a single row of Phi(r,a) for a given a_val using the trapezium rule.
 
@@ -1282,7 +1287,7 @@ def compute_phi_row_trapz(
         integrand: np.ndarray = psi_vals[valid_mask] / sqrt_term
 
         # Compute the square root term and the integrand
-        phi_row[j] = np.trapz(integrand, e_vals[valid_mask])
+        phi_row[j] = trapz(integrand, e_vals[valid_mask])
     return i, phi_row
 
 def compute_phi_row_gauss(
@@ -1295,7 +1300,7 @@ def compute_phi_row_gauss(
         upper_limit: Optional[Union[float, Callable]] = None, 
         split_points: Optional[list[Union[float, Callable]]] = None
     ):
-    """
+    r"""
     Compute Phi(r,a) for a general eccentricity distribution Psi(e,a)
     Piecewise, fixed-order Gauss-Legendre integration for a single row of the Phi(r,a) kernel.
 
@@ -1421,7 +1426,7 @@ def compute_phi_row_gauss_adaptive(
         upper_limit=None,
         tol=1e-10,
         max_level=25):
-    """
+    r"""
     Adaptive Gauss-Legendre integration for one row of Phi(r,a).
 
     This is particularly useful when there are discontinuities in the eccentricity distribution,
@@ -1572,7 +1577,7 @@ def compute_phi_single_gauss(
         upper_limit: Optional[Callable], 
         split_points: Optional[list[Union[float, Callable]]]
     ):
-    """
+    r"""
     Compute Phi(r,a) for a single point using fixed-order Gauss-Legendre quadrature with piecewise integration.
     This is used for fixed-order Gauss-Legendre integration as part of the adaptive grid method.
 
@@ -1680,7 +1685,7 @@ def compute_phi_single_gauss_adaptive(
         tol: float = 1e-10, 
         max_level: int = 25
     ):
-    """
+    r"""
     Compute Phi(r,a) for a single point using adaptive Gauss-Legendre quadrature.
     This is used for adaptive integration when using the adaptive grid method.
 
@@ -1778,7 +1783,7 @@ def compute_phi_single_quad(
         psi_func: Callable,
         upper_limit: Optional[Callable],
     ) -> float:
-    """
+    r"""
     Compute Phi(r,a) for a single point using scipy.integrate.quad.
 
     Parameters
@@ -1842,7 +1847,7 @@ def compute_phi_row_quad(
         eps: float = 1e-8,
         upper_limit: Optional[Callable] = None, 
     ):
-    """
+    r"""
     Compute Phi(r,a) for an entire row using scipy.integrate.quad.
 
     Parameters

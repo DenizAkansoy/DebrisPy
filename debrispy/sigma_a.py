@@ -9,7 +9,7 @@ from typing import Callable, Optional, Tuple, Union
 
 class SigmaA:
     """
-    Represents a surface density profile, :math:`\Sigma(a)`, as a function of semi-major axis.
+    Represents a surface density profile, Sigma(a), as a function of semi-major axis.
 
     Attributes
     ----------
@@ -29,7 +29,7 @@ class SigmaA:
         profile_type: str = 'power_law',
         **kwargs,
     ) -> None:
-        """
+        r"""
         Initialize a profile object.
 
         Attributes
@@ -202,7 +202,7 @@ class SigmaA:
         ax: Optional[plt.Axes] = None,
         **plot_kwargs,
     ) -> Tuple[plt.Figure, plt.Axes]:
-        """
+        r"""
         Plot the surface density profile with flexible matplotlib customization.
 
         Parameters
@@ -262,8 +262,8 @@ class SigmaA:
         line = ax.plot(a_vals, sigma_vals, **default_kwargs)
 
         # Set default labels and grid (unless overridden later by user)
-        ax.set_xlabel('Semi-Major Axis, $a$', fontsize=14)
-        ax.set_ylabel('Surface Density, $\\Sigma(a)$', fontsize=14)
+        ax.set_xlabel(r'Semi-Major Axis, $a$', fontsize=14)
+        ax.set_ylabel(r'Surface Density, $\Sigma(a)$', fontsize=14)
         ax.grid(True)
 
         plt.tight_layout()
@@ -280,7 +280,7 @@ class SigmaA:
 
     def compute_area(self) -> float:
         """
-        Compute the integral of :math:`\Sigma(a)` over [a_min, a_max].
+        Compute the integral Sigma(a) over [a_min, a_max].
 
         Returns
         -------

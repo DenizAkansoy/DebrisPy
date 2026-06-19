@@ -540,7 +540,7 @@ class ASD:
         Parameters
         ----------
         r : float
-            Radius at which Σ̄(r) is being computed.
+            Radius at which ASD is being computed.
         a_grid : ndarray
             Precomputed array of semi-major axis values.
         ecc_vals : ndarray

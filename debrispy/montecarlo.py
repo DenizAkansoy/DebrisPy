@@ -1,17 +1,25 @@
 # Import necessary modules
 # ------------------------------------------------------------------------------------------------ #
 import numpy as np
-from tqdm import tqdm
+from numpy.fft import rfft2, irfft2
+import scipy.signal as sig
+import warnings
 
-from .asd import ASD
-from .kernel import Kernel 
 from .eccentricity import UniqueEccentricity
 
 from matplotlib import pyplot as plt
-import fast_histogram
 from matplotlib.colors import LogNorm
+import fast_histogram
+from matplotlib.patches import Ellipse
+
+from dataclasses import dataclass
+from typing import Literal, Optional, Tuple
+
 # ------------------------------------------------------------------------------------------------ #
 
+
+# Constant
+TWO_SQRT2_LN2 = 2.0 * np.sqrt(2.0 * np.log(2.0))
 
 def kepler_solver(
         M: float, 
@@ -41,7 +49,8 @@ def kepler_solver(
     """
     # Ensure M and e are arrays
     M = np.atleast_1d(M)
-    E = np.copy(M)
+    # Initial guess
+    E = M + e * np.sin(M)
 
     # Iterate until the solution converges
     for _ in range(max_iter):
@@ -52,6 +61,451 @@ def kepler_solver(
         if np.max(np.abs(delta_E)) < tol:
             break
     return E
+
+def _gaussian_2d_kernel(sx_bins: float, sy_bins: float, theta: float = 0.0) -> np.ndarray:
+    """
+    Generate a 2D Gaussian kernel for Cartesian coordinates.
+    """
+    nx = int(np.ceil(4.0 * sx_bins))
+    ny = int(np.ceil(4.0 * sy_bins))
+    x = np.arange(-nx, nx + 1, dtype=float)
+    y = np.arange(-ny, ny + 1, dtype=float)
+    X, Y = np.meshgrid(x, y)  # (Ny, Nx)
+
+    c, s = np.cos(theta), np.sin(theta)
+    Xp =  c * X + s * Y
+    Yp = -s * X + c * Y
+
+    K = np.exp(-0.5 * ((Xp / sx_bins)**2 + (Yp / sy_bins)**2))
+    K /= K.sum()
+    return K
+
+def _mean_step(edges: np.ndarray) -> float:
+    d = np.diff(edges)
+    return float(np.mean(d))
+
+@dataclass
+class Histogram1D:
+    """
+    Container for a 1D histogram from MonteCarlo sampling.
+
+    Attributes
+    ----------
+    edges : np.ndarray
+        Bin edges, shape (N+1,).
+    values : np.ndarray
+        Histogram values after surface-density normalisation, shape (N,).
+    kind : {'a', 'r'}
+        'a' = semi-major axis Sigma_a(a), 'r' = radial (ASD).
+    scaled : bool
+        True if the histogram was scaled to match the true area under Sigma_a(a),
+        False if no scaling applied.
+    """
+    edges: np.ndarray
+    values: np.ndarray
+    kind: Literal['a', 'r']
+    scaled: bool
+
+    @property
+    def centers(self) -> np.ndarray:
+        """Bin centers."""
+        return 0.5 * (self.edges[1:] + self.edges[:-1])
+
+    @property
+    def widths(self) -> np.ndarray:
+        """Bin widths."""
+        return np.diff(self.edges)
+
+    # def as_tuple_centers(self) -> Tuple[np.ndarray, np.ndarray]:
+    #     """(centers, values) for plotting."""
+    #     return self.centers, self.values
+
+    # def as_tuple_edges(self) -> Tuple[np.ndarray, np.ndarray]:
+    #     """(edges, values) for plotting or rebinning."""
+    #     return self.edges, self.values  
+    
+    def get_values(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """(edges, centers, centre values) for plotting."""
+        return self.edges, self.centers, self.values
+
+
+    def plot(self, ax=None, label=None, color=None, linestyle='-', **kwargs):
+        """Plot the histogram.
+        
+        Parameters
+        ----------
+        ax : matplotlib.axes.Axes, optional
+            Axes to plot on. If None, a new figure is created.
+        label : str, optional
+            Label for the plot.
+        color : str, optional
+            Color for the plot.
+        linestyle : str, optional
+            Linestyle for the plot.
+        **kwargs : dict, optional
+            Additional keyword arguments for the plot.
+
+        Returns
+        -------
+        ax : matplotlib.axes.Axes
+            Axes object with the plot.
+        """
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(8,6))
+        edges, centers, values = self.get_values()
+        ax.plot(centers, values, label=label, color=color, linestyle=linestyle, **kwargs)
+        return ax
+
+@dataclass
+class Histogram2D:
+    """
+    Container for a 2D histogram.
+
+    Attributes
+    ----------
+    x_edges : np.ndarray
+        Bin edges along x (Cartesian) or r (polar), shape (Nx+1,).
+    y_edges : np.ndarray
+        Bin edges along y (Cartesian) or phi (polar), shape (Ny+1,).
+    values : np.ndarray
+        2D array of histogram values, shape (Ny, Nx), suitable for:
+            plt.pcolormesh(x_edges, y_edges, values)
+    mode : {'cartesian', 'polar'}
+        Coordinate system.
+    """
+    x_edges: np.ndarray
+    y_edges: np.ndarray
+    values: np.ndarray
+    mode: Literal['cartesian', 'polar']
+
+    # --- Aliases/Helpers ---
+    @property
+    def r_edges(self) -> np.ndarray:
+        """Alias for x_edges when mode='polar'."""
+        if self.mode != 'polar':
+            raise AttributeError("r_edges is only available when mode='polar'.")
+        return self.x_edges
+
+    @property
+    def phi_edges(self) -> np.ndarray:
+        """Alias for y_edges when mode='polar'."""
+        if self.mode != 'polar':
+            raise AttributeError("phi_edges is only available when mode='polar'.")
+        return self.y_edges
+    
+    def get_values(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """(edges, centers, centre values) for plotting."""
+        return self.x_edges, self.y_edges, self.values
+
+    def pad_to_limits(self,
+                    xlim: Optional[Tuple[float, float]] = None,
+                    ylim: Optional[Tuple[float, float]] = None,
+                    floor_value: float = 0.0) -> "Histogram2D":
+        """
+        Return a histogram whose edges cover (xlim, ylim). Outside the original
+        extent we create new bins (same mean bin size) and fill them with
+        `floor_value`. If limits lie inside, we crop.
+        """
+        if xlim is None: xlim = (self.x_edges[0], self.x_edges[-1])
+        if ylim is None: ylim = (self.y_edges[0], self.y_edges[-1])
+
+        # Ensure xlim, ylim are increasing
+        x0, x1 = min(xlim), max(xlim)
+        y0, y1 = min(ylim), max(ylim)
+
+        # Mean bin sizes (works fine if bins are already uniform)
+        dx = _mean_step(self.x_edges)
+        dy = _mean_step(self.y_edges)
+
+        # Compute how many bins to add on each side
+        import math
+        n_left  = max(0, math.ceil((self.x_edges[0] - x0) / dx))
+        n_right = max(0, math.ceil((x1 - self.x_edges[-1]) / dx))
+        n_bot   = max(0, math.ceil((self.y_edges[0] - y0) / dy))
+        n_top   = max(0, math.ceil((y1 - self.y_edges[-1]) / dy))
+
+        # Build new edges
+        if n_left:
+            x_extra_left = self.x_edges[0] - dx * np.arange(n_left, 0, -1)
+            x_edges_new = np.concatenate([x_extra_left, self.x_edges])
+        else:
+            x_edges_new = self.x_edges.copy()
+
+        if n_right:
+            x_extra_right = self.x_edges[-1] + dx * np.arange(1, n_right + 1)
+            x_edges_new = np.concatenate([x_edges_new, x_extra_right])
+
+        if n_bot:
+            y_extra_bot = self.y_edges[0] - dy * np.arange(n_bot, 0, -1)
+            y_edges_new = np.concatenate([y_extra_bot, self.y_edges])
+        else:
+            y_edges_new = self.y_edges.copy()
+
+        if n_top:
+            y_extra_top = self.y_edges[-1] + dy * np.arange(1, n_top + 1)
+            y_edges_new = np.concatenate([y_edges_new, y_extra_top])
+
+        # Pad values with floor_value to match the new edges
+        V = np.asarray(self.values, float)
+        pad_y = (n_bot, n_top)
+        pad_x = (n_left, n_right)
+        if any(p > 0 for p in (*pad_y, *pad_x)):
+            V = np.pad(V, (pad_y, pad_x), mode="constant", constant_values=floor_value)
+
+        # Now crop to requested limits exactly (bin-aligned)
+        # Figure out slice indices in new grid covering [x0,x1], [y0,y1]
+        ix0 = max(0, int(np.floor((x0 - x_edges_new[0]) / dx)))
+        ix1 = min(len(x_edges_new) - 1, int(np.ceil((x1 - x_edges_new[0]) / dx)))
+        iy0 = max(0, int(np.floor((y0 - y_edges_new[0]) / dy)))
+        iy1 = min(len(y_edges_new) - 1, int(np.ceil((y1 - y_edges_new[0]) / dy)))
+
+        x_edges_out = x_edges_new[ix0:ix1+1]
+        y_edges_out = y_edges_new[iy0:iy1+1]
+        V_out = V[iy0:iy1, ix0:ix1]
+
+        return Histogram2D(x_edges=x_edges_out, y_edges=y_edges_out, values=V_out, mode=self.mode)
+
+    def convolve_gaussian(self, *,
+                        fwhm_x: Optional[float] = None,
+                        fwhm_y: Optional[float] = None,
+                        sigma_x: Optional[float] = None,
+                        sigma_y: Optional[float] = None,
+                        theta: float = 0.0,
+                        pad: float = 5.0) -> "Histogram2D":
+        """
+        Convolve with a rotated Gaussian PSF.
+
+        Parameters
+        ----------
+        fwhm_x, fwhm_y : float, optional
+            FWHM in *axis units*
+            If only fwhm_x is given, use circular PSF (fwhm_y = fwhm_x).
+        sigma_x, sigma_y : float, optional
+            Sigma in *axis units*
+            Mutually exclusive with FWHM. If only sigma_x is given, use circular PSF.
+        theta : float
+            Rotation angle (radians, CCW).
+        pad : float
+            Padding margin to retain PSF wings.
+
+        Returns
+        -------
+        Histogram2D
+            Convolved histogram.
+        """
+        if self.mode != "cartesian":
+            raise ValueError("Gaussian PSF convolution only supported for cartesian histograms.")
+
+        # --- Mutually exclusive & defaults ---
+        has_fwhm = (fwhm_x is not None) or (fwhm_y is not None)
+        has_sigma = (sigma_x is not None) or (sigma_y is not None)
+        if has_fwhm and has_sigma:
+            raise ValueError("Provide either FWHM or sigma, not both.")
+        if not has_fwhm and not has_sigma:
+            raise ValueError("Provide at least one of FWHM or sigma.")
+        if fwhm_y is None and fwhm_x is not None:
+            fwhm_y = fwhm_x
+        if sigma_y is None and sigma_x is not None:
+            sigma_y = sigma_x
+
+        # --- Bin scales ---
+        dx = float(np.mean(np.diff(self.x_edges)))
+        dy = float(np.mean(np.diff(self.y_edges)))
+
+        if has_fwhm:
+            sx_bins = (fwhm_x / TWO_SQRT2_LN2) / dx
+            sy_bins = (fwhm_y / TWO_SQRT2_LN2) / dy
+        else:
+            sx_bins = sigma_x / dx
+            sy_bins = sigma_y / dy
+
+        # Build Gaussian kernel in bin units
+        K = _gaussian_2d_kernel(sx_bins, sy_bins, theta)
+
+        V = np.ascontiguousarray(self.values, dtype=float)
+        Vy, Vx = V.shape
+
+        # How many pixels of padding to capture sides
+        pad_x = int(np.ceil(pad * sx_bins))
+        pad_y = int(np.ceil(pad * sy_bins))
+
+        if pad_x or pad_y:
+            Vpad = np.pad(V, ((pad_y, pad_y), (pad_x, pad_x)), mode="constant", constant_values=0.0)
+            # Expand edges accordingly (preserve axis units)
+            x_edges_out = np.r_[self.x_edges[0] - np.arange(pad_x, 0, -1)*dx,
+                                self.x_edges,
+                                self.x_edges[-1] + np.arange(1, pad_x+1)*dx]
+            y_edges_out = np.r_[self.y_edges[0] - np.arange(pad_y, 0, -1)*dy,
+                                self.y_edges,
+                                self.y_edges[-1] + np.arange(1, pad_y+1)*dy]
+        else:
+            Vpad = V
+            x_edges_out = self.x_edges
+            y_edges_out = self.y_edges
+
+        # Convolve via FFT
+        try:
+            Vconv = sig.fftconvolve(Vpad, K, mode="same")
+        except Exception:
+            Ky, Kx = K.shape
+            Fy = int(2**np.ceil(np.log2(Vpad.shape[0] + Ky - 1)))
+            Fx = int(2**np.ceil(np.log2(Vpad.shape[1] + Kx - 1)))
+            A = np.zeros((Fy, Fx), dtype=float); A[:Vpad.shape[0], :Vpad.shape[1]] = Vpad
+            B = np.zeros((Fy, Fx), dtype=float); B[:Ky, :Kx] = K
+            Vfull = irfft2(rfft2(A) * rfft2(B), s=(Fy, Fx))
+            Vconv = Vfull[:Vpad.shape[0], :Vpad.shape[1]]
+        
+        Vconv[np.abs(Vconv) < 1e-10] = 0.0
+
+        H_out = Histogram2D(x_edges=x_edges_out, y_edges=y_edges_out, values=Vconv, mode='cartesian')
+
+        # Normalise the histogram to match the true area under the curve
+        H_out._psf_info = {
+            "sigma_x": sx_bins * dx,
+            "sigma_y": sy_bins * dy,
+            "fwhm_x": sx_bins * dx * TWO_SQRT2_LN2,
+            "fwhm_y": sy_bins * dy * TWO_SQRT2_LN2,
+            "theta": theta,
+        }
+        return H_out
+
+
+    def plot(self, *,
+            log: bool = False,
+            cmap: str = "magma",
+            shading: str = "auto",
+            vmin=None, vmax=None,
+            floor_threshold=None, floor_value=None,
+            xlim: Optional[Tuple[float, float]] = None,
+            ylim: Optional[Tuple[float, float]] = None,
+            ax=None, colorbar: bool = True, cbar_label: str = "Counts per pixel",
+            show_psf: bool = False,
+            psf_scale: float = 1.0,
+            psf_loc: Tuple[float, float] = (0.12, 0.12),
+            psf_facecolor: str = "white",
+            psf_edgecolor: str = "black",
+            psf_alpha: float = 0.9,
+            save: bool = False, filepath: str = None):
+        """
+        Plot with optional xlim/ylim. Regions outside the histogram are
+        binned with same bin size and filled with `floor_value` (default=0).
+
+        Parameters
+        ----------
+        log : bool, optional
+            If True, use a logarithmic scale.
+        cmap : str, optional
+            Colormap to use.
+        shading : str, optional
+            Shading to use.
+        vmin : float, optional
+            Minimum value to use for the colorbar.
+        vmax : float, optional
+            Maximum value to use for the colorbar.
+        floor_threshold : float, optional
+            Threshold value to use for flooring.
+        floor_value : float, optional
+            Value to use for flooring.
+        xlim : tuple, optional
+            x-axis limits.
+        ylim : tuple, optional
+            y-axis limits.
+        ax : matplotlib.axes.Axes, optional
+            Axes to plot on.
+        colorbar : bool, optional
+            If True, show the colorbar.
+        cbar_label : str, optional
+            Label for the colorbar.
+        show_psf: bool, optional
+            If True, show the PSF.
+        psf_scale: float, optional
+            Scale factor for the PSF.
+        psf_loc: tuple, optional
+            Location of the PSF.
+        psf_facecolor: str, optional
+            Facecolor of the PSF.
+        psf_edgecolor: str, optional
+            Edgecolor of the PSF.
+        psf_alpha: float, optional
+            Alpha of the PSF.
+        save : bool, optional
+            If True, save the figure.
+        filepath : str, optional
+            Filepath to save the figure.
+
+        Returns
+        -------
+        ax : matplotlib.axes.Axes
+            Axes object with the plot.
+        """
+        # If limits extend beyond, pad out with a floor
+        pad_floor = floor_value if floor_value is not None else (floor_threshold if floor_threshold is not None else 0.0)
+        H = self if (xlim is None and ylim is None) else self.pad_to_limits(xlim, ylim, floor_value=pad_floor)
+
+        if ax is None:
+            fig_w = 12 if H.mode == 'cartesian' else 10
+            fig_h = 8 if H.mode == 'cartesian' else 5
+            _, ax = plt.subplots(figsize=(fig_w, fig_h))
+
+        data = np.array(H.values, copy=True)
+
+        # Apply flooring inside the plotted region
+        if floor_threshold is not None:
+            if floor_value is None:
+                floor_value = floor_threshold
+            data[data < floor_threshold] = floor_value
+
+        # Norm / scaling
+        if log:
+            vmin_eff = vmin if (vmin is not None) else np.nanmax([np.nanmin(data[data > 0]), 1e-300])
+            norm = LogNorm(vmin=vmin_eff, vmax=vmax if vmax is not None else np.nanmax(data))
+            pcm = ax.pcolormesh(H.x_edges, H.y_edges, data, cmap=cmap, norm=norm, shading=shading)
+        else:
+            pcm = ax.pcolormesh(H.x_edges, H.y_edges, data, cmap=cmap, shading=shading, vmin=vmin, vmax=vmax)
+
+        # Labels/aspect
+        if H.mode == 'cartesian':
+            ax.set_aspect('equal', adjustable='box')
+            ax.set_xlabel("x [AU]"); ax.set_ylabel("y [AU]")
+        else:
+            ax.set_xlabel("r [AU]"); ax.set_ylabel(r"$\phi$ [rad]")
+            ax.set_ylim(0, 2*np.pi)
+        
+        # Draw PSF marker if present
+        if show_psf and H.mode == "cartesian" and hasattr(H, "_psf_info"):
+            psf = H._psf_info
+
+            # Use FWHM to draw the beam/PSF marker
+            width = psf_scale * psf["fwhm_x"]
+            height = psf_scale * psf["fwhm_y"]
+            angle_deg = np.degrees(psf["theta"])
+
+            # Position in axes-fraction coordinates, converted to data coordinates
+            x0, x1 = ax.get_xlim()
+            y0, y1 = ax.get_ylim()
+            xc = x0 + psf_loc[0] * (x1 - x0)
+            yc = y0 + psf_loc[1] * (y1 - y0)
+
+            beam = Ellipse(
+                (xc, yc),
+                width=width,
+                height=height,
+                angle=angle_deg,
+                facecolor=psf_facecolor,
+                edgecolor=psf_edgecolor,
+                alpha=psf_alpha,
+                lw=1.0,
+                zorder=10
+            )
+            ax.add_patch(beam)
+
+        if colorbar:
+            plt.colorbar(pcm, ax=ax, label=cbar_label)
+
+        if save:
+            plt.savefig(filepath, dpi = 300, bbox_inches = "tight")
+
+        return ax
 
 class MonteCarlo:
     """
@@ -224,8 +678,6 @@ class MonteCarlo:
         self.e_samples = e_samples
         return e_samples
 
-
-
     def sampler(
             self, 
             use_jacobian: bool = True,
@@ -307,8 +759,8 @@ class MonteCarlo:
             self, 
             bins: int = 500, 
             scale: bool = True,
-            verbose: bool = True,
-        ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+            verbose: bool = True
+        ):
         """
         Compute the 1D histogram of semi-major axis and radial positions.
 
@@ -323,49 +775,58 @@ class MonteCarlo:
             Whether to scale the histogram to match the true area under the surface density profile.
         verbose : bool, optional
             Whether to print progress messages.
-        
+
         Returns
         -------
-        bin_centers_a : np.ndarray
-            Bin centers for the semi-major axis histogram.
-        hist_a : np.ndarray
-            Histogram of semi-major axis values.
-        bin_centers_r : np.ndarray
-            Bin centers for the radial position histogram.
-        hist_r : np.ndarray
-            Histogram of radial positions.
+        histA : Histogram1D
+            1D Histogram object of semi-major axis values.
+        histR : Histogram1D
+            1D Histogram object of radial positions.
         """
-        # If the radial positions are not already cached with Jacobian = True, sample them
+        # Ensure we have samples with Jacobian=True (physical)
         if self._use_jacobian is True:
             if self.r_samples is None:
-                a_samples, r_samples, e_samples, f_samples = self.sampler(use_jacobian=True, verbose=verbose)
+                a_samples, r_samples, _, _ = self.sampler(use_jacobian=True, verbose=verbose)
             else:
                 a_samples = self.a_samples
                 r_samples = self.r_samples
         else:
-            a_samples, r_samples, e_samples, f_samples = self.sampler(use_jacobian=True, verbose=verbose)
-        
-        # Compute the histogram of semi-major axis values   
-        hist_a, bins_a = np.histogram(a_samples, bins=bins, density=True)  
-        bin_centers_a = 0.5 * (bins_a[1:] + bins_a[:-1])
+            if self._use_jacobian is not True:
+                warnings.warn("For 1D surface-density histograms, forcing use_jacobian=True.", RuntimeWarning)
+            a_samples, r_samples, _, _ = self.sampler(use_jacobian=True, verbose=verbose)
 
-        # Compute the histogram of radial positions
-        hist_r, bins_r = np.histogram(r_samples, bins=bins, density=True)
-        bin_centers_r = 0.5 * (bins_r[1:] + bins_r[:-1])      
+        # Histograms
+        pdf_a, edges_a = np.histogram(a_samples, bins=bins, density=True)
+        pdf_r, edges_r = np.histogram(r_samples, bins=bins, density=True)
 
-        # If scaling is requested, compute the scaling factor
+        # Bin centers
+        centers_a = 0.5 * (edges_a[1:] + edges_a[:-1])
+        centers_r = 0.5 * (edges_r[1:] + edges_r[:-1])
+
+        eps = 0.0
+        if np.any(centers_a == 0) or np.any(centers_r == 0):
+            eps = np.finfo(float).eps
+
+        # Surface-density normalisation: divide by radius
+        vals_a = pdf_a / (centers_a + eps)
+        vals_r = pdf_r / (centers_r + eps)
+
         if scale:
-            bin_widths = np.diff(bins_a)
-            sigma_a_est = hist_a / bin_centers_a
-            area_est = np.sum(sigma_a_est * bin_widths)
+            bin_widths_a = np.diff(edges_a)
+            area_est = np.sum(vals_a * bin_widths_a)
             true_area = self.sigma_a.compute_area()
-            scaling = true_area / area_est
+            if area_est > 0:
+                scaling = true_area / area_est
+                vals_a *= scaling
+                vals_r *= scaling
+            scaled_flag = True
         else:
-            scaling = 1.0
-        
-        # Return the histograms
-        return bin_centers_a, hist_a * scaling / bin_centers_a, bin_centers_r, hist_r * scaling / bin_centers_r
-            
+            scaled_flag = False
+
+        histA = Histogram1D(edges=edges_a, values=vals_a, kind='a', scaled=scaled_flag)
+        histR = Histogram1D(edges=edges_r, values=vals_r, kind='r', scaled=scaled_flag)
+        return histA, histR
+
     def plot_1d(
             self, 
             bins: int = 500, 
@@ -398,24 +859,21 @@ class MonteCarlo:
         y_lim : tuple[float, float], optional
             Limits for the y-axis.
         """
-        bin_centers_a, hist_a, bin_centers_r, hist_r = self.get_1d_histogram(bins=bins, scale=scale, verbose=False)
-
-        # Create the plot
-        fig, ax = plt.subplots(figsize=(8, 6))
+        histA, histR = self.get_1d_histogram(bins=bins, scale=scale, verbose=False)
 
         # Plot the histograms
-        ax.plot(bin_centers_a, hist_a, label="MC - $\\Sigma_a(a)$", color="red", linestyle="-")
-        ax.plot(bin_centers_r, hist_r, label="MC - $\\Sigma_r(r)$", color="green", linestyle="-")
+        fig, ax = plt.subplots(figsize=(8, 6))
+        histA.plot(ax=ax, label=r"MC - $\Sigma_a(a)$", color="red")
+        histR.plot(ax=ax, label=r"MC - $\Sigma_r(r)$", color="green")
+
 
         # If overlay is requested, compute the analytic ASD
         if overlay:
             if asd is None:
                 raise ValueError("`asd` must be provided if overlay=True.")
-            else:
-                r_vals, sigma_r_vals = asd.get_values()
-                
+            
+            r_vals, sigma_r_vals = asd.get_values()
             ax.plot(r_vals, sigma_r_vals, label="$\\bar{\\Sigma}(r)$", color="darkorange", linestyle="--")
-
             a_vals = np.linspace(min(r_vals), max(r_vals), 1000)
             sigma_a_analytic = self.sigma_a.get_values(a_vals)
             ax.plot(a_vals, sigma_a_analytic, label="$\\Sigma_a(a)$", color="blue", linestyle="--")
@@ -425,10 +883,8 @@ class MonteCarlo:
         ax.set_xlabel(r"$a, r$", fontsize=15)
         ax.legend(fontsize=14)
         ax.tick_params(axis='both', which='major', labelsize=15)
-        if x_lim is not None:
-            ax.set_xlim(x_lim)
-        if y_lim is not None:
-            ax.set_ylim(y_lim)
+        if x_lim: ax.set_xlim(x_lim)
+        if y_lim: ax.set_ylim(y_lim)
         ax.grid()
 
         if save:
@@ -438,35 +894,20 @@ class MonteCarlo:
         else:
             plt.show()
 
-
-    def get_cart_histogram(self, bins=500, varpi_func=None, verbose: bool = True):
+    def get_cart_histogram(self, bins=500, varpi_func=None, verbose: bool = True, *, surface_density: bool = True):
         """
         Return a 2D histogram and edges in Cartesian (x, y) coordinates.
 
-        Parameters
-        ----------
-        bins : int
-            Number of bins along each axis for the 2D histogram.
-        varpi_func : callable, optional
-            Function of a_samples returning varpi(a).
-        verbose : bool, optional
-            Whether to print progress messages.
-
         Returns
         -------
-        hist : ndarray
-            2D histogram (bins x bins).
-        x_edges : ndarray
-            Bin edges along x.
-        y_edges : ndarray
-            Bin edges along y.
+        hist_cart : Histogram2D
+            2D Histogram object in Cartesian coordinates (values shape: Ny x Nx).
         """
         if self.r_samples is None:
-            a_samples, r_samples, e_samples, f_samples = self.sampler(use_jacobian=False, verbose=verbose)
+            a_samples, r_samples, e_samples, f_samples = self.sampler(use_jacobian=True, verbose=verbose)
         else:
             a_samples = self.a_samples
             r_samples = self.r_samples
-            e_samples = self.e_samples
             f_samples = self.f_samples
 
         varpi_samples = np.zeros_like(a_samples) if varpi_func is None else varpi_func(a_samples)
@@ -475,106 +916,98 @@ class MonteCarlo:
         x_samples = r_samples * np.cos(theta_samples)
         y_samples = r_samples * np.sin(theta_samples)
 
-        x_min, x_max = x_samples.min(), x_samples.max()
-        y_min, y_max = y_samples.min(), y_samples.max()
+        # Build edges first, then use their span as histogram range
+        if isinstance(bins, int):
+            x_min, x_max = x_samples.min(), x_samples.max()
+            y_min, y_max = y_samples.min(), y_samples.max()
+            x_edges = np.linspace(x_min, x_max, bins + 1)
+            y_edges = np.linspace(y_min, y_max, bins + 1)
+            H = fast_histogram.histogram2d(
+                x_samples, y_samples,
+                bins=[bins, bins],
+                range=[[x_edges[0], x_edges[-1]], [y_edges[0], y_edges[-1]]]
+            )
+        else:
+            raise ValueError("`bins` must be an integer")
+        
+        H2 = H.T
+        if surface_density:
+            dx = np.diff(x_edges); dy = np.diff(y_edges)
+            if not (np.allclose(dx, dx[0]) and np.allclose(dy, dy[0])):
+                raise ValueError("surface_density=True requires uniform Cartesian bins.")
+            H2 = H2 / (dx[0] * dy[0])
 
-        hist = fast_histogram.histogram2d(
-            x_samples, y_samples,
-            bins=[bins, bins],
-            range=[[x_min, x_max], [y_min, y_max]]
-        )
-        x_edges = np.linspace(x_min, x_max, bins + 1)
-        y_edges = np.linspace(y_min, y_max, bins + 1)
-        return hist, x_edges, y_edges
+        hist_cart = Histogram2D(x_edges=x_edges, y_edges=y_edges, values=H2, mode='cartesian')
+        return hist_cart
 
-    def get_polar_histogram(self, bins=500, varpi_func=None, verbose: bool = True):
+    def get_polar_histogram(self, bins=500, varpi_func=None, verbose: bool = True, *, surface_density: bool = True):
         """
-        Return a 2D histogram on a Cartesian (r, φ) grid.
+        Return a 2D histogram on a polar (r, phi) grid.
 
         Returns
         -------
-        hist : ndarray
-            2D histogram (shape: [phi_bins, r_bins]).
-        r_edges : ndarray
-            Bin edges in radius.
-        phi_edges : ndarray
-            Bin edges in azimuth (radians, from 0 to 2pi).
-        verbose : bool, optional
-            Whether to print progress messages.
+        hist_polar : Histogram2D
+            2D Histogram object in polar coordinates.
         """
         if self.r_samples is None:
-            a_samples, r_samples, e_samples, f_samples = self.sampler(use_jacobian=False, verbose=verbose)
+            a_samples, r_samples, e_samples, f_samples = self.sampler(use_jacobian=True, verbose=verbose)
         else:
             a_samples = self.a_samples
             r_samples = self.r_samples
-            e_samples = self.e_samples
             f_samples = self.f_samples
 
         varpi_samples = np.zeros_like(a_samples) if varpi_func is None else varpi_func(a_samples)
-        phi_samples = (f_samples + varpi_samples) % (2 * np.pi)
+        phi_samples = (f_samples + varpi_samples) % (2.0 * np.pi)
 
-        r_min, r_max = r_samples.min(), r_samples.max()
-        phi_min, phi_max = 0, 2 * np.pi
+        if isinstance(bins, int):
+            r_min, r_max = r_samples.min(), r_samples.max()
+            r_edges = np.linspace(r_min, r_max, bins + 1)
+            phi_edges = np.linspace(0.0, 2.0 * np.pi, bins + 1)
+            H_rphi = fast_histogram.histogram2d(
+                r_samples, phi_samples,
+                bins=[bins, bins],
+                range=[[r_edges[0], r_edges[-1]], [phi_edges[0], phi_edges[-1]]]
+            )
+        else:
+         raise ValueError("`bins` must be an integer") 
+        
+        H2 = H_rphi.T
 
-        hist = fast_histogram.histogram2d(
-            r_samples, phi_samples,
-            bins=[bins, bins],
-            range=[[r_min, r_max], [phi_min, phi_max]]
-        )
+        if surface_density:
+            r_centers = 0.5 * (r_edges[1:] + r_edges[:-1])   # (Nr,)
+            dr        = np.diff(r_edges)                     # (Nr,)
+            dphi      = np.diff(phi_edges)                   # (Nphi,)
+            area = (r_centers[None, :] * dr[None, :] * dphi[:, None])  # (Nphi, Nr)
+            H2 = H2 / area
 
-        r_edges = np.linspace(r_min, r_max, bins + 1)
-        phi_edges = np.linspace(phi_min, phi_max, bins + 1)
-        return hist.T, r_edges, phi_edges
+        hist_polar = Histogram2D(x_edges=r_edges, y_edges=phi_edges, values=H2, mode='polar')
+        return hist_polar
 
-    def plot_2d(self, varpi_func=None, bins=500, log=True, mode='cartesian', save=False, filepath=None):
+    def plot_2d(self, varpi_func=None, bins=500, log=True, mode='cartesian',
+                save=False, filepath=None, surface_density=True, **plot_kwargs):
         """
-        Plot a 2D spatial histogram of particle positions in Cartesian (x, y) or polar-grid (r, φ) view.
-
-        Parameters
-        ----------
-        varpi_func : callable, optional
-            Function of a_samples returning varpi(a).
-        bins : int 
-            Number of bins.
-        log : bool
-            Whether to use logarithmic colormap normalization.
-        mode : str
-            Either 'cartesian' or 'polar'.
-        save : bool
-            Whether to save the figure.
-        filepath : str or Path, optional
-            Save path if save=True.
+        Thin wrapper around Histogram2D.plot().
+        Extra kwargs are forwarded to Histogram2D.plot (e.g., cmap, shading, vmin, vmax, colorbar=False).
         """
         print(f"Generating 2D histogram in {mode} coordinates...")
 
         if mode == 'cartesian':
-            hist, x_edges, y_edges = self.get_cart_histogram(bins=bins, varpi_func=varpi_func, verbose=False)
-
-            plt.figure(figsize=(8, 8))
-            norm = LogNorm() if log else None
-            plt.pcolormesh(x_edges, y_edges, hist.T, cmap='magma', norm=norm)
-            plt.colorbar(label='Counts per pixel')
-            plt.xlabel("x [AU]")
-            plt.ylabel("y [AU]")
-            plt.axis("equal")
-
+            hist = self.get_cart_histogram(bins=bins, varpi_func=varpi_func, verbose=False, surface_density=surface_density)
         elif mode == 'polar':
-            hist, r_edges, phi_edges = self.get_polar_histogram(bins, varpi_func=varpi_func, verbose=False)
-
-            plt.figure(figsize=(10, 5))
-            norm = LogNorm() if log else None
-            plt.pcolormesh(r_edges, phi_edges, hist, cmap='magma', norm=norm, shading='auto')
-            plt.xlabel("r [AU]")
-            plt.ylabel(r"$\phi$ [rad]")
-            plt.colorbar(label='Counts per pixel')
-            plt.ylim(0, 2 * np.pi)
-
+            hist = self.get_polar_histogram(bins=bins, varpi_func=varpi_func, verbose=False, surface_density=surface_density)
         else:
-            raise ValueError("mode must be 'cartesian' or 'polargrid'")
+            raise ValueError("mode must be 'cartesian' or 'polar'")
+
+        if surface_density:
+            plot_kwargs['cbar_label'] = "Surface Density (Unnormalised)"
+        else:
+            plot_kwargs['cbar_label'] = "Counts per Bin"
+
+        ax = hist.plot(log=log, **plot_kwargs)
 
         if save:
             if filepath is None:
                 raise ValueError("`filepath` must be specified if save=True.")
             plt.savefig(filepath, dpi=300)
-
-        plt.show()
+        else:
+            plt.show()
