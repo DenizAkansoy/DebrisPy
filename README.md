@@ -41,6 +41,30 @@ DebrisPy provides tools for:
 - using built-in profiles or arbitrary user-defined functions;
 - optional adaptive gridding, interpolation, and parallelisation for more demanding calculations.
 
+
+## *Important: custom functions must be vectorised*
+
+User-supplied functions should be vectorised. DebrisPy evaluates many profiles and distributions on NumPy arrays, so scalar Python conditionals such as `if`/`else` will usually fail or behave incorrectly.
+
+For example, avoid:
+
+```python
+def bad_profile(a):
+    if a < 50:
+        return 0.0
+    return a**-1
+```
+
+Use NumPy-aware operations instead:
+
+```python
+import numpy as np
+
+def good_profile(a):
+    return np.where(a < 50, 0.0, a**-1)
+```
+
+Boolean masks and array arithmetic are also suitable.
 ---
 
 ## **Documentation**
