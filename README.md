@@ -1,118 +1,167 @@
 # **DebrisPy**
 ## *A Python Package for Computing the Radial Profiles of Surface Density in Debris Discs*
 
-Welcome to **DebrisPy** — a lightweight package designed to compute the azimuthally averaged surface density (ASD) profiles in debris discs using both semi-analytical and Monte Carlo approaches ([see full documentation](#4-documentation) for usage and API reference).
+Welcome to **DebrisPy** — a lightweight package designed to compute the azimuthally averaged surface density (ASD) profiles in debris discs using both semi-analytical and Monte Carlo approaches ([see full documentation](#4-documentation) for usage).
 
 ![Demo](assets/demo.gif)
 
----
-
-## **Table of Contents**
-
-1. [Repository Structure](#1-repository-structure)  
-2. [Installation](#2-installation)  
-3. [Dependencies](#3-dependencies)  
-4. [Documentation](#4-documentation)  
-5. [Example Notebooks](#5-example-notebooks)  
-6. [Testing](#6-testing)
 
 ---
 
-## **1. Repository Structure**
+## **Installation**
 
-Breakdown of the repository's folder structure and its purpose:
+1. The package can be installed via PyPI directly:
 
-- **`debrispy/`**  
-  Core package code, including all class implementations.
-
-- **`tests/`**  
-  Contains a test suite using `pytest`. See [Section 6](#6-testing) for further information.
-
-- **`examples/`**  
-  Example files (both `.py` and `.ipynb`) showcasing how to use the package.
-
-- **`docs/`**  
-  Contains the full Sphinx-generated documentation (both the source files and built html files). The documentation can easily be accessed online without requiring manual building or download. See [Section 4](#4-documentation) for viewing instructions.
-
-
----
-
-## **2. Installation**
+```bash
+pip install debrispy
+```
 
 > **Important:** DebrisPy requires **Python 3.8 or higher**.
 
-To install the `DebrisPy` package locally:
 
-1. Clone the repository from the GitLab directory:
-
+2. For development, clone the repository and install in editable mode:
 
 ```bash
-git clone <repository-url>
-cd DebrisPy  # Navigate to the parent directory
-```
-
-2. Install the python package:
-
-
-```bash
-pip install . 
+git clone https://github.com/DenizAkansoy/DebrisPy.git
+cd DebrisPy
+pip install -e .
 ```
 
 ---
 
-## **3. Dependencies**
+## **Features**
 
-All required dependencies are automatically installed when installing the package via `pip`.
+DebrisPy provides tools for:
 
-**Numerical and Scientific Computing**
-
-- `numpy`: fast array manipulation and vectorised math
-- `scipy`: numerical integration, special functions, and interpolation
-- `fast_histogram`: high-performance 1D/2D histogramming
-- `adaptive`: optional grid refinement and adaptive sampling
-- `matplotlib`: 1D and 2D surface density plotting
-- `tqdm`: progress bars for long-running sampling routines
-- `joblib`: parallel execution for kernel computations
-
+- defining semi-major-axis surface-density profiles;
+- specifying unique eccentricity profiles or eccentricity distributions;
+- constructing eccentricity kernels for ASD calculations;
+- computing azimuthally averaged surface-density profiles;
+- validating and visualising results with Monte Carlo sampling;
+- using built-in profiles or arbitrary user-defined functions;
+- optional adaptive gridding, interpolation, and parallelisation for more demanding calculations.
 
 ---
 
-## **4. Documentation**
+## **Documentation**
 
-The documentation contains information on each class within the package, and provides examples on various use cases. This can be accessed online via debrispy.readthedocs.io
+The full documentation is available online:
 
-The source files for the documentation are also provided in the main repository.
+```text
+https://debrispy.readthedocs.io
+```
 
+The documentation includes worked examples, API references, implementation notes, and notebook-based tutorials.
 
+The documentation source files are located in:
+
+```text
+docs/source/
+```
+
+To build the documentation locally:
+
+```bash
+cd docs
+make html
+open build/html/index.html
+```
 
 ---
 
-## **5. Example Notebooks**
+## Repository structure
 
-This repository includes a collection of Jupyter notebooks (found in the `notebooks` directory) that demonstrate how to use the DebrisPy package in practice. These are organised into two subdirectories:
-
-- `docs_notebooks/`
-These notebooks form the main section of the documentation. They are well-annotated, with clear, step-by-step examples showing how to initialise and use each of the core classes (e.g., SigmaA, Kernel, ASD, MonteCarlo).*We recommend looking through these notebooks before the others, as they provide the most accessible introduction to the package.*
-
-
-- `report_notebooks/`
-These notebooks were used to generate all figures and results shown in the MPhil report.
-While not structured as tutorials, they are still lightly commented and provide insight into how the package can be applied in research scenarios, including benchmarking, model comparison, and analysis of specific case studies.
+```text
+debrispy/              Core package code
+docs/source/           Sphinx documentation source
+examples/              Example notebooks and scripts
+tests/                 Test suite
+assets/                README/demo assets
+```
 
 ---
 
-## **6. Tests**
+## **Examples**
 
-This package includes a set of automated tests using the `pytest` framework, located in the `tests/` directory.
+Example notebooks are provided in the `examples/` directory. These demonstrate how to define input profiles, construct eccentricity kernels, compute ASD profiles, and compare semi-analytic calculations with Monte Carlo realisations.
 
-> `pytest` is a lightweight Python framework for writing and running test functions to automatically verify that code behaves as expected.
+---
 
-After installing the package, we recommend running the test suite to ensure that the package has been installed correctly. This can be run from the root directory, by executing:
+## **Dependencies**
+
+Core dependencies are installed automatically when installing DebrisPy with:
+
+```bash
+pip install debrispy
+```
+
+These include:
+
+- `numpy`
+- `scipy`
+- `matplotlib`
+- `fast_histogram`
+- `adaptive`
+- `tqdm`
+- `joblib`
+
+Additional optional dependencies are needed for development, testing, and building the documentation.
+
+For development and testing:
+
+```bash
+pip install -e ".[dev]"
+```
+
+This installs additional packages such as:
+
+- `pytest`
+- `ipykernel`
+- `notebook`
+
+For building the documentation locally:
+
+```bash
+pip install -e ".[docs]"
+```
+
+This installs additional packages such as:
+
+- `sphinx`
+- `sphinx-rtd-theme`
+- `myst-parser`
+- `nbsphinx`
+
+## **Testing**
+
+After cloning the repository, the test suite can be run with:
 
 ```bash
 pytest tests/
 ```
 
+For development, install the package with the optional development dependencies:
+
+```bash
+pip install -e ".[dev]"
+pytest tests/
+```
+
 ---
 
-For any further questions regarding usage, please see the documentation. Feel free to contact Deniz Akansoy via da619@cam.ac.uk, any feedback would be greately appreciated.
+## **Testing**
+
+To run the test suite, clone the repository and install the optional development dependencies:
+
+```bash
+git clone https://github.com/DenizAkansoy/DebrisPy.git
+cd DebrisPy
+pip install -e ".[dev]"
+pytest tests/
+```
+
+---
+
+## **Contact**
+
+For questions, bug reports, or feedback, please open an issue on GitHub or contact Deniz Akansoy at `da619@cam.ac.uk`.
