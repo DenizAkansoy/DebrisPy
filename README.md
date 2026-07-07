@@ -65,6 +65,7 @@ def good_profile(a):
 ```
 
 Boolean masks and array arithmetic are also suitable.
+
 ---
 
 ## **Documentation**
