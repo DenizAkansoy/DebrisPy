@@ -42,7 +42,7 @@ DebrisPy provides tools for:
 - optional adaptive gridding, interpolation, and parallelisation for more demanding calculations.
 
 
-## *Important: custom functions must be vectorised*
+### *Important: custom functions must be vectorised*
 
 User-supplied functions should be vectorised. DebrisPy evaluates many profiles and distributions on NumPy arrays, so scalar Python conditionals such as `if`/`else` will usually fail or behave incorrectly.
 
