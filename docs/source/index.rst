@@ -1,27 +1,57 @@
-.. DebrisPy documentation master file, created by
-   sphinx-quickstart on Mon May  5 18:39:51 2025.
-   You can adapt this file completely to your liking, but it should at least
-   contain the root `toctree` directive.
+Welcome to DebrisPy
+===================
+
+.. image:: https://img.shields.io/badge/GitHub-DebrisPy-blue?logo=github
+   :target: https://github.com/DenizAkansoy/DebrisPy
+   :alt: GitHub repository
+
+.. image:: https://img.shields.io/pypi/v/debrispy
+   :target: https://pypi.org/project/debrispy/
+   :alt: PyPI version
+
+.. image:: https://img.shields.io/pypi/pyversions/debrispy
+   :target: https://pypi.org/project/debrispy/
+   :alt: Python versions
+
+.. image:: https://github.com/DenizAkansoy/DebrisPy/actions/workflows/tests.yml/badge.svg
+   :target: https://github.com/DenizAkansoy/DebrisPy/actions/workflows/tests.yml
+   :alt: Tests
+
+.. image:: https://img.shields.io/pypi/l/debrispy
+   :target: https://github.com/DenizAkansoy/DebrisPy/blob/main/LICENSE
+   :alt: License
 
 
-Welcome to DebrisPy!
-====================
+``DebrisPy`` is a Python package for modelling the surface-density structure of
+eccentric debris discs using a semi-analytic formalism.
 
-`DebrisPy` is a Python package for modeling the surface density structure of debris discs using a semi-analytic formalism.
-Based on the semi-analytic framework presented in `Rafikov (2023) <https://academic.oup.com/mnras/article/519/4/5607/6845736>`_, `DebrisPy` models the azimuthally averaged surface density profile, :math:`\bar{\Sigma}(r)`, based on arbitrary distributions of semi-major axis and orbital eccentricity. As explained in this documentation, the package offers robust tools for forward-modelling and visualisation.
+Based on the framework presented in `Rafikov (2023) <https://academic.oup.com/mnras/article/519/4/5607/6845736>`_,
+``DebrisPy`` computes azimuthally averaged surface-density profiles,
+:math:`\bar{\Sigma}(r)`, from prescribed distributions of semi-major axis and
+orbital eccentricity.
 
+The package is designed for forward-modelling debris-disc structures and for
+exploring how eccentric parent-body distributions map into observable radial
+surface-density profiles.
 
-	•	Flexible: Supports both deterministic and eccentricity distribution models, and allows custom surface density profiles.
-	•	Efficient: Offers vectorized and optionally parallelized computation with support for grid refinement.
-	•	Validated: Includes an independently implemented Monte Carlo sampler to verify the accuracy of semi-analytic ASD predictions.
-
-
-Key Features
+Key features
 ------------
 
-- Compute and visualise :math:`\bar{\Sigma}(r)` from input :math:`\Sigma_a(a)` and :math:`\psi(e, a)` profiles.
-- Perform 1D sampling of :math:`\bar{\Sigma}(r)` and 2D sampling of :math:`\Sigma(r, \phi)`.
-- Compare analytic and sampling-based results with built-in plotting tools
+- Compute and visualise azimuthally averaged surface-density profiles,
+  :math:`\bar{\Sigma}(r)`, from input :math:`\Sigma_a(a)` and
+  :math:`\psi(e,a)` profiles.
+- Support both deterministic eccentricity profiles, :math:`e(a)`, and full
+  eccentricity distributions, :math:`\psi(e,a)`.
+- Define built-in or user-supplied semi-major-axis and eccentricity profiles.
+- Construct eccentricity kernels and evaluate the corresponding ASD integral.
+- Perform Monte Carlo sampling as an independent check of the semi-analytic
+  calculation.
+- Generate 1D radial profiles and 2D surface-density realisations.
+- Use optional adaptive gridding, interpolation, and parallelisation for more
+  demanding calculations.
+
+Documentation contents
+----------------------
 
 .. toctree::
    :maxdepth: 1
@@ -50,17 +80,10 @@ Key Features
    benchmarks
    api_reference
 
-
-.. Indices and tables
-.. ------------------
-
-.. * :ref:`genindex`
-.. * :ref:`modindex`
-.. * :ref:`search`
-
-
 Contact
 -------
 
-This package was developed and is maintained by Deniz Akansoy
-If you have any questions, feedback, or suggestions, feel free to reach out via: da619@cam.ac.uk
+This package was developed and is maintained by Deniz Akansoy.
+
+For questions, feedback, or suggestions, please open an issue on GitHub or
+contact Deniz Akansoy at ``da619@cam.ac.uk``.
