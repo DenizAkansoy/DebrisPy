@@ -59,7 +59,7 @@ nbsphinx_execute = 'auto'
 html_theme = 'sphinx_rtd_theme'
 html_static_path = ['_static']
 
-html_logo = '_static/debrispy_logo.jpeg'
+html_logo = '_static/DebrisPy_Logo.jpeg'
 
 html_theme_options = {
     'logo_only': False,
