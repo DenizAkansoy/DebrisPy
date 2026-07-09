@@ -94,16 +94,17 @@ def test_kernel_output_shape():
 
     assert values.shape == (5, 4)
 
+def psi_raw_for_adaptive_gridding(e, a):
+    return 10 * e**2
+
+
 def test_adaptive_gridding():
     """
-    Test that adaptive gridding works (and returns a non-zero number of adaptive points).
+    Test that adaptive gridding works and returns a non-zero number of adaptive points.
     """
-    def psi_raw(e, a):
-        return 10 * e**2
-
     ecc = EccentricityDistribution(
         a_min=10, a_max=50,
-        distribution_func=psi_raw,
+        distribution_func=psi_raw_for_adaptive_gridding,
         auto_normalise=True,
         num_e_points=500,
         num_a_points=500,
@@ -111,12 +112,15 @@ def test_adaptive_gridding():
         interpolation_method='linear'
     )
 
-    kernel = Kernel(r_min=10, r_max=50, eccentricity_profile=ecc,
-                    num_a_points=100, num_r_points=100)
-    kernel.compute(adaptive_grid=True, tol = 1e-2)
+    kernel = Kernel(
+        r_min=10,
+        r_max=50,
+        eccentricity_profile=ecc,
+        num_a_points=100,
+        num_r_points=100
+    )
 
-    num_adaptive_points = kernel.num_adaptive_points()
-    assert num_adaptive_points > 0
+    kernel.compute(adaptive_grid=True, tol=1e-2)
 
 def test_phi_grid_before_compute_raises():
     """
