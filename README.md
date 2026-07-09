@@ -1,4 +1,11 @@
 # **DebrisPy**
+
+[![PyPI version](https://img.shields.io/pypi/v/debrispy)](https://pypi.org/project/debrispy/)
+[![Python versions](https://img.shields.io/pypi/pyversions/debrispy)](https://pypi.org/project/debrispy/)
+[![Tests](https://github.com/DenizAkansoy/DebrisPy/actions/workflows/tests.yml/badge.svg)](https://github.com/DenizAkansoy/DebrisPy/actions/workflows/tests.yml)
+[![Docs](https://readthedocs.org/projects/debrispy/badge/?version=latest)](https://debrispy.readthedocs.io/)
+[![License](https://img.shields.io/pypi/l/debrispy)](https://github.com/DenizAkansoy/DebrisPy/blob/main/LICENSE)
+
 ## *A Python Package for Computing the Radial Profiles of Surface Density in Debris Discs*
 
 Welcome to **DebrisPy** — a lightweight package designed to compute the azimuthally averaged surface density (ASD) profiles in debris discs using both semi-analytical and Monte Carlo approaches.
