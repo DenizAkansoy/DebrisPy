@@ -80,6 +80,28 @@ Documentation contents
    benchmarks
    api_reference
 
+Citing DebrisPy
+---------------
+
+If you use DebrisPy, or parts of its code, in your research, we would
+greatly appreciate it if you cited the paper introducing the package:
+
+`Debris Disc Substructures Induced by Secular Planetary Perturbations
+<https://arxiv.org/abs/2607.08750>`_
+
+.. code-block:: bibtex
+
+   @article{Rafikov2026,
+     author        = {Rafikov, Roman R. and Akansoy, Deniz and Sefilian, Antranik A.},
+     title         = {Debris Disc Substructures Induced by Secular Planetary Perturbations},
+     journal       = {arXiv e-prints},
+     year          = {2026},
+     eprint        = {2607.08750},
+     archiveprefix = {arXiv},
+     primaryclass  = {astro-ph.EP},
+     doi           = {10.48550/arXiv.2607.08750}
+   }
+
 Contact
 -------
 
