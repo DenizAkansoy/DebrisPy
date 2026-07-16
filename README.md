@@ -1,19 +1,17 @@
-# **DebrisPy**
-
 [![PyPI version](https://img.shields.io/pypi/v/debrispy)](https://pypi.org/project/debrispy/)
 [![Python versions](https://img.shields.io/pypi/pyversions/debrispy)](https://pypi.org/project/debrispy/)
 [![Tests](https://github.com/DenizAkansoy/DebrisPy/actions/workflows/tests.yml/badge.svg)](https://github.com/DenizAkansoy/DebrisPy/actions/workflows/tests.yml)
 [![Docs](https://readthedocs.org/projects/debrispy/badge/?version=latest)](https://debrispy.readthedocs.io/)
 [![License](https://img.shields.io/pypi/l/debrispy)](https://github.com/DenizAkansoy/DebrisPy/blob/main/LICENSE)
 
+# **DebrisPy**
+
 ## *A Python Package for Computing the Radial Profiles of Surface Density in Debris Discs*
 
-Welcome to **DebrisPy** — a lightweight package designed to compute the azimuthally averaged surface density (ASD) profiles in debris discs using both semi-analytical and Monte Carlo approaches.
+Welcome to **DebrisPy** — a lightweight Python package designed to compute the azimuthally averaged (radial) surface density profiles in debris discs using both semi-analytical and Monte Carlo approaches.
 
 ![Demo](assets/demo.gif)
 
-
----
 
 ## **Installation**
 
@@ -23,9 +21,6 @@ Welcome to **DebrisPy** — a lightweight package designed to compute the azimut
 pip install debrispy
 ```
 
-> **Important:** DebrisPy requires **Python 3.8 or higher**.
-
-
 2. For development, clone the repository and install in editable mode:
 
 ```bash
@@ -34,7 +29,8 @@ cd DebrisPy
 pip install -e .
 ```
 
----
+> **Important:** DebrisPy requires **Python 3.8 or higher**.
+
 
 ## **Features**
 
@@ -73,7 +69,6 @@ def good_profile(a):
 
 Boolean masks and array arithmetic are also suitable.
 
----
 
 ## **Documentation**
 
@@ -99,7 +94,6 @@ make html
 open build/html/index.html
 ```
 
----
 
 ## Repository structure
 
@@ -111,7 +105,6 @@ tests/                 Test suite
 assets/                README/demo assets
 ```
 
----
 
 ## **Examples**
 
@@ -164,22 +157,6 @@ This installs additional packages such as:
 - `myst-parser`
 - `nbsphinx`
 
-## **Testing**
-
-After cloning the repository, the test suite can be run with:
-
-```bash
-pytest tests/
-```
-
-For development, install the package with the optional development dependencies:
-
-```bash
-pip install -e ".[dev]"
-pytest tests/
-```
-
----
 
 ## **Testing**
 
@@ -192,7 +169,22 @@ pip install -e ".[dev]"
 pytest tests/
 ```
 
----
+## **Acknowledgments**
+
+If you use DebrisPy (or parts of its code) in your research, we would greatly appreciate it if you cited the paper introducing the package:
+
+```bibtex
+@article{Rafikov2026,
+  author        = {Rafikov, Roman R. and Akansoy, Deniz and Sefilian, Antranik A.},
+  title         = {Debris Disc Substructures Induced by Secular Planetary Perturbations},
+  journal       = {arXiv e-prints},
+  year          = {2026},
+  eprint        = {2607.08750},
+  archiveprefix = {arXiv},
+  primaryclass  = {astro-ph.EP},
+  doi           = {10.48550/arXiv.2607.08750}
+}
+```
 
 ## **Contact**
 
