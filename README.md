@@ -6,9 +6,8 @@
 
 # **DebrisPy**
 
-## *A Python Package for Computing the Radial Profiles of Surface Density in Debris Discs*
 
-Welcome to **DebrisPy** — a lightweight Python package designed to compute the azimuthally averaged (radial) surface density profiles in debris discs using both semi-analytical and Monte Carlo approaches.
+Welcome to **DebrisPy** — a lightweight Python package designed to compute the azimuthally averaged (radial) profiles of surface density profiles in debris discs.
 
 ![Demo](assets/demo.gif)
 
