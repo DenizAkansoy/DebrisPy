@@ -72,28 +72,15 @@ Boolean masks and array arithmetic are also suitable.
 
 ## **Documentation**
 
-The full documentation is available online:
-
-```text
-https://debrispy.readthedocs.io
-```
+The full documentation is available at [debrispy.readthedocs.io](https://debrispy.readthedocs.io).
 
 The documentation includes worked examples, API references, implementation notes, and notebook-based tutorials.
 
-The documentation source files are located in:
+The documentation source files are also located in:
 
 ```text
 docs/source/
 ```
-
-To build the documentation locally:
-
-```bash
-cd docs
-make html
-open build/html/index.html
-```
-
 
 ## Repository structure
 
