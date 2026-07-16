@@ -175,7 +175,7 @@ If you use DebrisPy (or parts of its code) in your research, we would greatly ap
 
 ```bibtex
 @article{Rafikov2026,
-  author        = {Rafikov, Roman R. and Akansoy, Deniz and Sefilian, Antranik A.},
+  author        = {Roman R. Rafikov and Deniz Akansoy and Antranik A. Sefilian},
   title         = {Debris Disc Substructures Induced by Secular Planetary Perturbations},
   journal       = {arXiv e-prints},
   year          = {2026},
